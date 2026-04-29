@@ -44,10 +44,53 @@ void llamar_rpc_log(char *usuario, char *operacion, char *fichero) {
     CLIENT *clnt = clnt_create(host, LOG_PROG, LOG_VERS, "tcp");
     if (clnt == NULL) return;
 
-    // llamada a la función definida en el archivo .x
-    // Ej: log_operacion_1(usuario, operacion, fichero, clnt);
+    struct log_data data;
+    data.usuario = usuario;
+    data.operacion = operacion;
+    data.fichero = fichero;
+
+    int *result = log_operacion_1(&data, clnt); // Nombre según tu .x [cite: 216]
+    if (result == NULL) {
+        clnt_perror(clnt, "Error RPC");
+    }
     
     clnt_destroy(clnt);
+}
+
+// función para enviar mensajes pendientes a un usuario (Protocolo 2.3)
+int enviar_a_cliente(char *ip, int puerto, char *op_protocolo, char *remitente, unsigned int id, char *msg, char *file) {
+    int sock;
+    struct sockaddr_in addr;
+
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) return -1;
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(puerto);
+    inet_pton(AF_INET, ip, &addr.sin_addr);
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        return -1;
+    }
+
+    // Según Protocolo 2.3 [cite: 107-119, 125-128]
+    char id_str[11];
+    sprintf(id_str, "%u", id);
+
+    send_todo(sock, op_protocolo, 256); // "SEND_MESSAGE_ATTACH" o "SEND_MESS_ATTACH_ACK"
+    
+    if (strcmp(op_protocolo, "SEND_MESSAGE_ATTACH") == 0) {
+        send_todo(sock, remitente, 256);
+        send_todo(sock, id_str, 256);
+        send_todo(sock, msg, 256);
+        send_todo(sock, file, 256);
+    } else { // ACK al remitente
+        send_todo(sock, id_str, 256);
+        send_todo(sock, file, 256);
+    }
+
+    close(sock);
+    return 0;
 }
 
 //Hilo que procesa la petición de un cliente
@@ -105,8 +148,28 @@ void *tratar_peticion(void *args) {
 
         llamar_rpc_log(user_src, "SENDATTACH", file); 
 
-        // 2. Intentar entrega al destinatario (Protocolo servidor-cliente) 
-        // 3. Notificar al remitente (ACK) (Protocolo 2.3) 
+        // 2. Intentar entrega inmediata al destinatario 
+        char dst_ip[16];
+        int dst_port;
+        if (esta_conectado(user_dst, dst_ip, &dst_port) == 0) { // Si el destino está online
+            int err = enviar_a_cliente(dst_ip, dst_port, "SEND_MESSAGE_ATTACH", user_src, id, msg, file);
+            if (err == 0) {
+                // 3. Notificar éxito al remitente (ACK)
+                enviar_a_cliente(client_ip, puerto_cliente, "SEND_MESS_ATTACH_ACK", user_src, id, "", file);
+            } else {
+                // Error de red: Marcar como desconectado y guardar 
+                desconectar_usuario(user_dst);
+                guardar_mensaje_pendiente(user_dst, (MensajePendiente){...}); // Llenar struct [cite: 79]
+            }
+        } else {
+            // Destinatario offline: Guardar en el servidor [cite: 79]
+            MensajePendiente m;
+            strncpy(m.remitente, user_src, 256);
+            m.id = id;
+            strncpy(m.mensaje, msg, 256);
+            strncpy(m.nombre_fichero, file, 256);
+            guardar_mensaje_pendiente(user_dst, m);
+        }
 
     } else if (strcmp(op, "USERS") == 0) {
         char user_src[256] = {0};
