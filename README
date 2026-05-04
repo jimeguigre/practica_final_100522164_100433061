@@ -1,0 +1,23 @@
+# Práctica de Sistemas Distribuidos - Servicio de Mensajería
+## Instrucciones de Compilación y Despliegue
+
+### 1. Compilación de los Servidores en C
+En la carpeta raíz del proyecto donde se encuentra el código fuente y el Makefile, ejecute el siguiente comando para generar automáticamente el código RPC y compilar ambos servidores (el de mensajería y el de log):
+$ make
+
+### 2. Despliegue del Servidor de Log (RPC)
+Inicie el servidor de registro que imprimirá las operaciones realizadas por los usuarios:
+$ ./rpc_server
+
+### 3. Despliegue del Servicio Web (Python)
+Abra una nueva terminal y ejecute el microservicio Flask encargado de normalizar los mensajes (asegúrese de tener instaladas las dependencias con `pip install flask requests`):
+$ python3 word_service.py
+
+### 4. Despliegue del Servidor de Mensajería (C)
+En una nueva terminal, configure la variable de entorno obligatoria para que el servidor localice el servicio RPC y ejecútelo en el puerto deseado (por ejemplo, 8888):
+$ export LOG_RPC_IP=127.0.0.1
+$ ./server 8888
+
+### 5. Ejecución del Cliente (Python)
+Por último, abra tantas terminales como usuarios desee simular. Ejecute el script cliente pasando la IP y el puerto del servidor de mensajería:
+$ python3 client_2.py -s localhost -p 8888
