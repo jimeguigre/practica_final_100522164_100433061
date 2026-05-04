@@ -3,6 +3,7 @@ import argparse
 import socket
 import threading
 import struct
+import requests
 
 class client:
 
@@ -21,7 +22,7 @@ class client:
     _listen_socket = None        # socket de escucha para mensajes entrantes
     _listen_thread = None        # hilo receptor de mensajes
     _listen_port = -1            # puerto de escucha asignado
-
+    _connected_users_info = {}   # Guarda { 'nombre': ('IP', puerto) }
     # ****************** AUXILIARES ******************
 
     @staticmethod
