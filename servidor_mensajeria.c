@@ -113,7 +113,7 @@ void *tratar_peticion(void *args) {
         send_todo(client_sock, &res_byte, 1); 
         
         llamar_rpc_log(user, "REGISTER", "");
-
+    
     } else if (strcmp(op, "CONNECT") == 0) {
         char user[256] = {0};
         recv_todo(client_sock, user, 256);
@@ -126,7 +126,17 @@ void *tratar_peticion(void *args) {
         uint8_t res_byte = (uint8_t)res;
         send_todo(client_sock, &res_byte, 1);
 
-        llamar_rpc_log(user, "CONNECT", ""); 
+        llamar_rpc_log(user, "CONNECT", "");
+        if (res == 0) {
+            MensajePendiente pendientes[50];
+            int num_pend = obtener_mensajes_pendientes(user, pendientes);
+            for(int i = 0; i < num_pend; i++) {
+                if(strlen(pendientes[i].nombre_fichero) > 0) {
+                    enviar_a_cliente(client_ip, puerto_cliente, "SEND_MESSAGE_ATTACH", pendientes[i].remitente, pendientes[i].id, pendientes[i].mensaje, pendientes[i].nombre_fichero);
+                } else {
+                    enviar_a_cliente(client_ip, puerto_cliente, "SEND_MESSAGE", pendientes[i].remitente, pendientes[i].id, pendientes[i].mensaje, "");
+                }
+            } 
         
         // TODO: Si res == 0, enviar mensajes pendientes aquí (Protocolo 2.3)
 
