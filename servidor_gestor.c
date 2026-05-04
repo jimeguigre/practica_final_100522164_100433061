@@ -190,3 +190,15 @@ int obtener_mensajes_pendientes(char *nombre, MensajePendiente *buffer_msg) {
     pthread_mutex_unlock(&mutex_usuarios);
     return cantidad;
 }
+
+int existe_usuario(char *nombre) {
+    pthread_mutex_lock(&mutex_usuarios);
+    for (int i = 0; i < total_usuarios; i++) {
+        if (strcmp(usuarios[i].nombre, nombre) == 0) {
+            pthread_mutex_unlock(&mutex_usuarios);
+            return 1; // Sí existe
+        }
+    }
+    pthread_mutex_unlock(&mutex_usuarios);
+    return 0; // No existe
+}

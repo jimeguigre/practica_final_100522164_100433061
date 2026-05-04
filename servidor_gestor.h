@@ -83,4 +83,10 @@ int obtener_mensajes_pendientes(char *nombre, MensajePendiente *buffer_msg);
  * @return 0 si está conectado, 1 si no lo está o no existe.
  */
 int esta_conectado(char *nombre, char *ip, int *puerto);
+
+/**
+ * @brief Comprueba si un usuario existe en el sistema.
+ * @return 1 si existe, 0 si no existe.
+ */
+int existe_usuario(char *nombre);
 #endif
