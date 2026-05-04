@@ -247,7 +247,18 @@ class client:
             client._stop_listener()
             print("c> DISCONNECT FAIL")
             return client.RC.ERROR
-
+    
+    @staticmethod
+    def _normalize_message(message):
+        """Llama al servicio web local para eliminar espacios extra."""
+        try:
+            r = requests.post('http://127.0.0.1:5001/normalize', json={'message': message})
+            if r.status_code == 200:
+                return r.json().get('normalized_message', message)
+        except Exception:
+            pass # Si el servicio web no está levantado, usa el mensaje original
+        return message
+    
     @staticmethod
     def send(user, message):
         """
@@ -259,6 +270,7 @@ class client:
             return client.RC.ERROR
 
         try:
+            message = client._normalize_message(message)
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((client._server, client._port))
             client._send_field(s, "SEND")
@@ -309,6 +321,12 @@ class client:
                 for _ in range(num):
                     user_info = client._recv_field(s)
                     print(f"  {user_info}")
+                    parts = user_info.split(":")
+                    if len(parts) == 3:
+                        u_name = parts[0].strip()
+                        u_ip = parts[1].strip()
+                        u_port = int(parts[2].strip())
+                        client._connected_users_info[u_name] = (u_ip, u_port)
                 s.close()
                 return client.RC.OK
             elif res == 1:
