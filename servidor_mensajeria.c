@@ -185,7 +185,56 @@ void *tratar_peticion(void *args) {
             strncpy(m.nombre_fichero, file, 256);
             guardar_mensaje_pendiente(user_dst, m);
         }
+    } else if (strcmp(op, "UNREGISTER") == 0) {
+        char user[256] = {0};
+        recv_todo(client_sock, user, 256);
+        int res = eliminar_usuario(user);
+        uint8_t res_byte = (uint8_t)res;
+        send_todo(client_sock, &res_byte, 1);
+        llamar_rpc_log(user, "UNREGISTER", "");
 
+    } else if (strcmp(op, "DISCONNECT") == 0) {
+        char user[256] = {0};
+        recv_todo(client_sock, user, 256);
+        int res = desconectar_usuario(user);
+        uint8_t res_byte = (uint8_t)res;
+        send_todo(client_sock, &res_byte, 1);
+        llamar_rpc_log(user, "DISCONNECT", "");
+
+    } else if (strcmp(op, "SEND") == 0) {
+        char user_src[256] = {0}, user_dst[256] = {0}, msg[256] = {0};
+        recv_todo(client_sock, user_src, 256);
+        recv_todo(client_sock, user_dst, 256);
+        recv_todo(client_sock, msg, 256);
+
+        unsigned int id = generar_siguiente_id(user_src); 
+        uint8_t res_byte = 0; // Simulamos validación correcta de usuario destino
+        send_todo(client_sock, &res_byte, 1); 
+        char id_str[11];
+        sprintf(id_str, "%u", id);
+        send_todo(client_sock, id_str, 11); 
+
+        llamar_rpc_log(user_src, "SEND", ""); 
+
+        char dst_ip[16];
+        int dst_port;
+        if (esta_conectado(user_dst, dst_ip, &dst_port) == 0) {
+            int err = enviar_a_cliente(dst_ip, dst_port, "SEND_MESSAGE", user_src, id, msg, "");
+            if (err == 0) {
+                enviar_a_cliente(client_ip, puerto_cliente, "SEND_MESS_ACK", user_src, id, "", "");
+            } else {
+                desconectar_usuario(user_dst);
+                MensajePendiente m;
+                strncpy(m.remitente, user_src, 256); m.id = id;
+                strncpy(m.mensaje, msg, 256); memset(m.nombre_fichero, 0, 256);
+                guardar_mensaje_pendiente(user_dst, m);
+            }
+        } else {
+            MensajePendiente m;
+            strncpy(m.remitente, user_src, 256); m.id = id;
+            strncpy(m.mensaje, msg, 256); memset(m.nombre_fichero, 0, 256);
+            guardar_mensaje_pendiente(user_dst, m);
+        }
     } else if (strcmp(op, "USERS") == 0) {
         char user_src[256] = {0};
         recv_todo(client_sock, user_src, 256);
