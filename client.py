@@ -374,7 +374,37 @@ class client:
         except Exception:
             print("c> SENDATTACH FAIL")
             return client.RC.ERROR
+        
+    @staticmethod
+    def getfile(user, remote_filename, local_filename):
+        """Descarga un fichero directamente de otro usuario conectado[cite: 3]."""
+        if user not in client._connected_users_info:
+            # Si no está en caché, refrescamos la lista internamente[cite: 3]
+            client.users()
+            if user not in client._connected_users_info:
+                print("c> FILE TRANSFER FAILED, user not connected.")
+                return client.RC.ERROR
 
+        ip, port = client._connected_users_info[user]
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((ip, port))
+            client._send_field(s, "GET FILE")
+            client._send_field(s, client._connected_user)
+            client._send_field(s, remote_filename)
+            
+            with open(local_filename, 'wb') as f:
+                while True:
+                    data = s.recv(1024)
+                    if not data:
+                        break
+                    f.write(data)
+            s.close()
+            print("c> GETFILE OK")
+            return client.RC.OK
+        except Exception:
+            print("c> GETFILE FAIL")
+            return client.RC.ERROR
     # ******************** SHELL ********************
 
     @staticmethod
@@ -435,6 +465,13 @@ class client:
                             break
                         else:
                             print("Syntax error. Use: QUIT")
+                    
+                    elif line[0] == "GETFILE":
+                        if len(line) == 4:
+                            client.getfile(line[1], line[2], line[3])
+                        else:
+                            print("Syntax error. Usage: GETFILE <userName> <remoteFileName> <localFileName>")
+
                     else:
                         print("Error: command " + line[0] + " not valid.")
 
