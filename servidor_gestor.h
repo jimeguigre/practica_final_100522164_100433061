@@ -74,7 +74,12 @@ int obtener_usuarios_conectados(char **buffer, int *num_usuarios);
 unsigned int generar_siguiente_id(char *nombre_remitente);
 
 /**
- * @brief Guarda un mensaje en la cola de pendientes del destinatario[cite: 79].
+ * @brief Guarda un mensaje en la cola de pendientes del destinatario.
+ */
+int guardar_mensaje_pendiente(char *destinatario, MensajePendiente msg);
+
+/**
+ * @brief Obtiene y vacía los mensajes pendientes de un usuario.
  */
 int obtener_mensajes_pendientes(char *nombre, MensajePendiente *buffer_msg);
 
