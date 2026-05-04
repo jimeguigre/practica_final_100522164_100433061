@@ -140,3 +140,20 @@ int guardar_mensaje_pendiente(char *destinatario, MensajePendiente msg) {
     pthread_mutex_unlock(&mutex_usuarios);
     return -1;
 }
+
+int esta_conectado(char *nombre, char *ip, int *puerto) {
+    pthread_mutex_lock(&mutex_usuarios);
+    for (int i = 0; i < total_usuarios; i++) {
+        if (strcmp(usuarios[i].nombre, nombre) == 0) {
+            if (usuarios[i].conectado) {
+                strcpy(ip, usuarios[i].ip);
+                *puerto = usuarios[i].puerto;
+                pthread_mutex_unlock(&mutex_usuarios);
+                return 0; // Sí está conectado
+            }
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_usuarios);
+    return 1; // No está conectado o no existe
+}
