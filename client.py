@@ -53,10 +53,6 @@ class client:
 
     @staticmethod
     def _listener_thread_func():
-        """
-        Hilo receptor: escucha conexiones entrantes del servidor.
-        Procesa SEND_MESSAGE (mensaje de otro usuario) y SEND_MESS_ACK (confirmación de entrega).
-        """
         listen_sock = client._listen_socket
         listen_sock.listen(10)
 
@@ -64,26 +60,39 @@ class client:
             try:
                 conn, _ = listen_sock.accept()
             except OSError:
-                # El socket fue cerrado (DISCONNECT), salimos del hilo
                 break
 
             try:
                 op = client._recv_field(conn)
 
-                if op == "SEND_MESSAGE":
-                    # Protocolo 8.6: recibir mensaje de otro usuario
+                if op == "SEND_MESSAGE" or op == "SEND_MESSAGE_ATTACH":
                     remitente = client._recv_field(conn)
                     id_msg    = client._recv_field(conn)
                     mensaje   = client._recv_field(conn)
-                    print(f"\ns> MESSAGE {id_msg} FROM {remitente}")
-                    print(mensaje)
-                    print("END")
+                    if op == "SEND_MESSAGE_ATTACH":
+                        fichero = client._recv_field(conn)
+                        print(f"\ns> MESSAGE {id_msg} FROM {remitente}\n{mensaje}\nEND\nFILE {fichero}")
+                    else:
+                        print(f"\ns> MESSAGE {id_msg} FROM {remitente}\n{mensaje}\nEND")
 
-                elif op == "SEND_MESS_ACK":
-                    # Protocolo 8.6: confirmación de entrega al remitente
+                elif op == "SEND_MESS_ACK" or op == "SEND_MESS_ATTACH_ACK":
                     id_msg = client._recv_field(conn)
-                    print(f"\nc> SEND MESSAGE {id_msg} OK")
+                    if op == "SEND_MESS_ATTACH_ACK":
+                        fichero = client._recv_field(conn)
+                        print(f"\nc> SENDATTACH MESSAGE {id_msg} {fichero} OK")
+                    else:
+                        print(f"\nc> SEND MESSAGE {id_msg} OK")
 
+                elif op == "GET FILE":
+                    # Petición de otro cliente para descargar un archivo
+                    remitente = client._recv_field(conn)
+                    fichero = client._recv_field(conn)
+                    try:
+                        with open(fichero, 'rb') as f:
+                            while chunk := f.read(1024):
+                                conn.sendall(chunk)
+                    except Exception as e:
+                        pass # Si no existe el fichero, simplemente se cierra la conexión
             except Exception:
                 pass
             finally:
