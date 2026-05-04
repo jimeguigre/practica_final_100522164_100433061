@@ -157,3 +157,36 @@ int esta_conectado(char *nombre, char *ip, int *puerto) {
     pthread_mutex_unlock(&mutex_usuarios);
     return 1; // No está conectado o no existe
 }
+
+int eliminar_usuario(char *nombre) {
+    pthread_mutex_lock(&mutex_usuarios);
+    for (int i = 0; i < total_usuarios; i++) {
+        if (strcmp(usuarios[i].nombre, nombre) == 0) {
+            // Movemos el último usuario a la posición actual para "borrarlo" y mantenemos el array compacto
+            usuarios[i] = usuarios[total_usuarios - 1];
+            total_usuarios--;
+            pthread_mutex_unlock(&mutex_usuarios);
+            return 0; // Éxito
+        }
+    }
+    pthread_mutex_unlock(&mutex_usuarios);
+    return 1; // Usuario no existe
+}
+
+// Función auxiliar para extraer los mensajes guardados al conectar
+int obtener_mensajes_pendientes(char *nombre, MensajePendiente *buffer_msg) {
+    pthread_mutex_lock(&mutex_usuarios);
+    int cantidad = 0;
+    for (int i = 0; i < total_usuarios; i++) {
+        if (strcmp(usuarios[i].nombre, nombre) == 0) {
+            cantidad = usuarios[i].num_pendientes;
+            for(int j = 0; j < cantidad; j++) {
+                buffer_msg[j] = usuarios[i].mensajes[j];
+            }
+            usuarios[i].num_pendientes = 0; // Se vacían porque los vamos a enviar
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_usuarios);
+    return cantidad;
+}
