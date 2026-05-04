@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "log_rpc.h"
 
 int *log_operacion_1_svc(struct log_data *input, struct svc_req *rqstp) {

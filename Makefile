@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g -pthread -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types
+CFLAGS = -Wall -g -pthread -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types -Wno-deprecated-non-prototype -Wno-pointer-sign
 RPCGEN = rpcgen
 
 all: server rpc_server
