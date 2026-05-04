@@ -78,4 +78,9 @@ unsigned int generar_siguiente_id(char *nombre_remitente);
  */
 int obtener_mensajes_pendientes(char *nombre, MensajePendiente *buffer_msg);
 
+/**
+ * @brief Comprueba si un usuario está conectado y devuelve su IP y puerto.
+ * @return 0 si está conectado, 1 si no lo está o no existe.
+ */
+int esta_conectado(char *nombre, char *ip, int *puerto);
 #endif
