@@ -76,6 +76,6 @@ unsigned int generar_siguiente_id(char *nombre_remitente);
 /**
  * @brief Guarda un mensaje en la cola de pendientes del destinatario[cite: 79].
  */
-int guardar_mensaje_pendiente(char *destinatario, MensajePendiente msg);
+int obtener_mensajes_pendientes(char *nombre, MensajePendiente *buffer_msg);
 
 #endif
