@@ -159,10 +159,15 @@ void *tratar_peticion(void *args) {
             } else {
                 // Error de red: Marcar como desconectado y guardar 
                 desconectar_usuario(user_dst);
-                guardar_mensaje_pendiente(user_dst, (MensajePendiente){...}); // Llenar struct [cite: 79]
+                guardar_mensaje_pendiente(user_dst, (MensajePendiente){MensajePendiente msg_fallido;
+                            strncpy(msg_fallido.remitente, user_src, 256);
+                            msg_fallido.id = id;
+                            strncpy(msg_fallido.mensaje, msg, 256);
+                            strncpy(msg_fallido.nombre_fichero, file, 256);
+                guardar_mensaje_pendiente(user_dst, msg_fallido);}); // Llenar struct 
             }
         } else {
-            // Destinatario offline: Guardar en el servidor [cite: 79]
+            // Destinatario offline: Guardar en el servidor
             MensajePendiente m;
             strncpy(m.remitente, user_src, 256);
             m.id = id;
