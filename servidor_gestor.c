@@ -75,9 +75,13 @@ int desconectar_usuario(char *nombre) {
     pthread_mutex_lock(&mutex_usuarios);
     for (int i = 0; i < total_usuarios; i++) {
         if (strcmp(usuarios[i].nombre, nombre) == 0) {
+            if (!usuarios[i].conectado) {         
+                pthread_mutex_unlock(&mutex_usuarios);
+                return 2; // existe pero no conectado
+            }
             usuarios[i].conectado = 0;
             pthread_mutex_unlock(&mutex_usuarios);
-            return 0; // se desconecta al usuario exitosamente
+            return 0;
         }
     }
     pthread_mutex_unlock(&mutex_usuarios);
@@ -121,6 +125,27 @@ int obtener_usuarios_conectados(char **buffer, int *num_usuarios) {
     *buffer = strdup(temp); // Reserva memoria dinámica con el resultado
     *num_usuarios = contador;
     
+    pthread_mutex_unlock(&mutex_usuarios);
+    return 0;
+}
+
+int obtener_usuarios_conectados_lista(char ***lista_nombres, int *num_usuarios) {
+    pthread_mutex_lock(&mutex_usuarios);
+    int contador = 0;
+    for (int i = 0; i < total_usuarios; i++) {
+        if (usuarios[i].conectado) contador++;
+    }
+
+    char **nombres = malloc(contador * sizeof(char *));
+    int j = 0;
+    for (int i = 0; i < total_usuarios; i++) {
+        if (usuarios[i].conectado) {
+            nombres[j] = strdup(usuarios[i].nombre);
+            j++;
+        }
+    }
+    *lista_nombres = nombres;
+    *num_usuarios = contador;
     pthread_mutex_unlock(&mutex_usuarios);
     return 0;
 }

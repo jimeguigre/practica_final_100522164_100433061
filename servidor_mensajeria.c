@@ -40,14 +40,15 @@ static ssize_t recv_todo(int sock, void *buf, size_t len) {
 /* ── Envía un campo de exactamente 256 bytes (relleno con \0) ── */
 static int send_field(int sock, const char *str) {
     char buf[256] = {0};
-    strncpy(buf, str, 255);
+    if (str != NULL) 
+        strncpy(buf, str, 255);
     return (send_todo(sock, buf, 256) == 256) ? 0 : -1;
 }
 
 /* ── Llama al servicio RPC de log ── */
 void llamar_rpc_log(char *usuario, char *operacion, char *fichero) {
     char *host = getenv("LOG_RPC_IP");
-    if (host == NULL) return;
+    if (host == NULL) host = "localhost"; // Por defecto localhost
 
     CLIENT *clnt = clnt_create(host, LOG_PROG, LOG_VERS, "tcp");
     if (clnt == NULL) return;
@@ -55,7 +56,7 @@ void llamar_rpc_log(char *usuario, char *operacion, char *fichero) {
     struct log_data data;
     data.usuario   = usuario;
     data.operacion = operacion;
-    data.fichero   = fichero;
+    data.fichero   = fichero ? fichero : "";
 
     int *result = log_operacion_1(&data, clnt);
     if (result == NULL) clnt_perror(clnt, "Error RPC");
@@ -132,9 +133,7 @@ void *tratar_peticion(void *args) {
         uint8_t res_byte = (uint8_t)res;
         send_todo(client_sock, &res_byte, 1);
 
-        if (res == 0) printf("s> REGISTER %s OK\n",   user);
-        else          printf("s> REGISTER %s FAIL\n", user);
-
+        printf("s> %s %s %s\n", op, user, res == 0 ? "OK" : "FAIL");
         llamar_rpc_log(user, "REGISTER", "");
 
     /* ── UNREGISTER ── */
@@ -146,9 +145,7 @@ void *tratar_peticion(void *args) {
         uint8_t res_byte = (uint8_t)res;
         send_todo(client_sock, &res_byte, 1);
 
-        if (res == 0) printf("s> UNREGISTER %s OK\n",   user);
-        else          printf("s> UNREGISTER %s FAIL\n", user);
-
+        printf("s> %s %s %s\n", op, user, res == 0 ? "OK" : "FAIL");
         llamar_rpc_log(user, "UNREGISTER", "");
 
     /* ── CONNECT ── */
@@ -165,37 +162,24 @@ void *tratar_peticion(void *args) {
         uint8_t res_byte = (uint8_t)res;
         send_todo(client_sock, &res_byte, 1);
 
-        if (res == 0) printf("s> CONNECT %s OK\n",   user);
-        else          printf("s> CONNECT %s FAIL\n", user);
-
+        printf("s> %s %s %s\n", op, user, res == 0 ? "OK" : "FAIL");
         llamar_rpc_log(user, "CONNECT", "");
 
         /* Si la conexión fue exitosa, enviamos mensajes pendientes (protocolo 8.6) */
         if (res == 0) {
+            usleep(150000);  /* Pequeña espera para asegurar que el cliente ya está escuchando antes de enviar mensajes */
             MensajePendiente pendientes[50];
             int num_pend = obtener_mensajes_pendientes(user, pendientes);
             for (int i = 0; i < num_pend; i++) {
                 char *op_env = (strlen(pendientes[i].nombre_fichero) > 0)
                                ? "SEND_MESSAGE_ATTACH" : "SEND_MESSAGE";
-                int err = enviar_a_cliente(client_ip, puerto_cliente, op_env,
-                                           pendientes[i].remitente,
-                                           pendientes[i].id,
-                                           pendientes[i].mensaje,
-                                           pendientes[i].nombre_fichero);
-                if (err == 0) {
-                    printf("s> SEND MESSAGE %u FROM %s TO %s\n",
-                           pendientes[i].id, pendientes[i].remitente, user);
-                    /* Notificar al remitente si sigue conectado */
-                    char src_ip[16]; int src_port;
-                    if (esta_conectado(pendientes[i].remitente, src_ip, &src_port) == 0) {
-                        char *op_ack = (strlen(pendientes[i].nombre_fichero) > 0)
-                                       ? "SEND_MESS_ATTACH_ACK" : "SEND_MESS_ACK";
-                        enviar_a_cliente(src_ip, src_port, op_ack,
-                                         pendientes[i].remitente,
-                                         pendientes[i].id, "", pendientes[i].nombre_fichero);
+                if (enviar_a_cliente(client_ip, puerto_cliente, op_env, pendientes[i].remitente, pendientes[i].id, pendientes[i].mensaje, pendientes[i].nombre_fichero) == 0) {
+                    char s_ip[16]; int s_port;
+                    if (esta_conectado(pendientes[i].remitente, s_ip, &s_port) == 0) {
+                        char *op_ack = (strlen(pendientes[i].nombre_fichero) > 0) ? "SEND_MESS_ATTACH_ACK" : "SEND_MESS_ACK";
+                        enviar_a_cliente(s_ip, s_port, op_ack, pendientes[i].remitente, pendientes[i].id, "", pendientes[i].nombre_fichero);
                     }
                 } else {
-                    /* No se pudo entregar: volver a guardar */
                     guardar_mensaje_pendiente(user, pendientes[i]);
                 }
             }
@@ -210,157 +194,78 @@ void *tratar_peticion(void *args) {
         uint8_t res_byte = (uint8_t)res;
         send_todo(client_sock, &res_byte, 1);
 
-        if (res == 0) printf("s> DISCONNECT %s OK\n",   user);
-        else          printf("s> DISCONNECT %s FAIL\n", user);
-
+        printf("s> %s %s %s\n", op, user, res == 0 ? "OK" : "FAIL");
         llamar_rpc_log(user, "DISCONNECT", "");
 
-    /* ── SEND ── */
-    } else if (strcmp(op, "SEND") == 0) {
-        char user_src[256] = {0}, user_dst[256] = {0}, msg[256] = {0};
-        recv_todo(client_sock, user_src, 256);
-        recv_todo(client_sock, user_dst, 256);
+    /* ── SEND Y SENDATTACH ── */
+    } else if (strcmp(op, "SEND") == 0 || strcmp(op, "SENDATTACH") == 0) {
+        char src[256] = {0}, dst[256] = {0}, msg[256] = {0}, file[256] = {0};
+        int is_attach = (strcmp(op, "SENDATTACH") == 0);
+        recv_todo(client_sock, src, 256);
+        recv_todo(client_sock, dst, 256);
         recv_todo(client_sock, msg, 256);
+        if (is_attach) recv_todo(client_sock, file, 256);
 
-        if (!existe_usuario(user_dst)) {
-            /* Destinatario no existe */
+        if (!existe_usuario(dst)) {
             uint8_t res_byte = 1;
             send_todo(client_sock, &res_byte, 1);
         } else {
-            /* Generamos ID y respondemos éxito + ID al remitente */
-            unsigned int id = generar_siguiente_id(user_src);
+            unsigned int id = generar_siguiente_id(src);
             uint8_t res_byte = 0;
             send_todo(client_sock, &res_byte, 1);
-
-            char id_str[256] = {0};
-            sprintf(id_str, "%u", id);
-            send_field(client_sock, id_str);  /* ID como campo de 256 bytes */
-
-            llamar_rpc_log(user_src, "SEND", "");
-
-            /* Intentar entrega inmediata si el destinatario está conectado */
-            char dst_ip[16]; int dst_port;
-            if (esta_conectado(user_dst, dst_ip, &dst_port) == 0) {
-                int err = enviar_a_cliente(dst_ip, dst_port, "SEND_MESSAGE",
-                                           user_src, id, msg, "");
-                if (err == 0) {
-                    printf("s> SEND MESSAGE %u FROM %s TO %s\n", id, user_src, user_dst);
-                    /* Notificar ACK al remitente si sigue conectado */
-                    char src_ip[16]; int src_port;
-                    if (esta_conectado(user_src, src_ip, &src_port) == 0) {
-                        enviar_a_cliente(src_ip, src_port, "SEND_MESS_ACK",
-                                         user_src, id, "", "");
-                    }
-                } else {
-                    /* Fallo de entrega: marcar desconectado y guardar pendiente */
-                    desconectar_usuario(user_dst);
-                    MensajePendiente m;
-                    strncpy(m.remitente, user_src, 255);
-                    m.id = id;
-                    strncpy(m.mensaje, msg, 255);
-                    memset(m.nombre_fichero, 0, 256);
-                    guardar_mensaje_pendiente(user_dst, m);
-                    printf("s> MESSAGE %u FROM %s TO %s STORED\n", id, user_src, user_dst);
-                }
-            } else {
-                /* Destinatario desconectado: guardar pendiente */
-                MensajePendiente m;
-                strncpy(m.remitente, user_src, 255);
-                m.id = id;
-                strncpy(m.mensaje, msg, 255);
-                memset(m.nombre_fichero, 0, 256);
-                guardar_mensaje_pendiente(user_dst, m);
-                printf("s> MESSAGE %u FROM %s TO %s STORED\n", id, user_src, user_dst);
-            }
-        }
-
-    /* ── SENDATTACH ── */
-    } else if (strcmp(op, "SENDATTACH") == 0) {
-        char user_src[256] = {0}, user_dst[256] = {0};
-        char msg[256]      = {0}, file[256]      = {0};
-        recv_todo(client_sock, user_src, 256);
-        recv_todo(client_sock, user_dst, 256);
-        recv_todo(client_sock, msg,      256);
-        recv_todo(client_sock, file,     256);
-
-        if (!existe_usuario(user_dst)) {
-            uint8_t res_byte = 1;
-            send_todo(client_sock, &res_byte, 1);
-        } else {
-            unsigned int id = generar_siguiente_id(user_src);
-            uint8_t res_byte = 0;
-            send_todo(client_sock, &res_byte, 1);
-
-            char id_str[256] = {0};
-            sprintf(id_str, "%u", id);
+            char id_str[256]; sprintf(id_str, "%u", id);
             send_field(client_sock, id_str);
+            llamar_rpc_log(src, op, is_attach ? file : "");
 
-            llamar_rpc_log(user_src, "SENDATTACH", file);
-
-            char dst_ip[16]; int dst_port;
-            if (esta_conectado(user_dst, dst_ip, &dst_port) == 0) {
-                int err = enviar_a_cliente(dst_ip, dst_port, "SEND_MESSAGE_ATTACH",
-                                           user_src, id, msg, file);
-                if (err == 0) {
-                    printf("s> SEND MESSAGE %u FROM %s TO %s\n", id, user_src, user_dst);
-                    char src_ip[16]; int src_port;
-                    if (esta_conectado(user_src, src_ip, &src_port) == 0) {
-                        enviar_a_cliente(src_ip, src_port, "SEND_MESS_ATTACH_ACK",
-                                         user_src, id, "", file);
+            char d_ip[16]; int d_port;
+            if (esta_conectado(dst, d_ip, &d_port) == 0) {
+                char *op_cl = is_attach ? "SEND_MESSAGE_ATTACH" : "SEND_MESSAGE";
+                if (enviar_a_cliente(d_ip, d_port, op_cl, src, id, msg, file) == 0) {
+                    char s_ip[16]; int s_port;
+                    if (esta_conectado(src, s_ip, &s_port) == 0) {
+                        char *op_ack = is_attach ? "SEND_MESS_ATTACH_ACK" : "SEND_MESS_ACK";
+                        enviar_a_cliente(s_ip, s_port, op_ack, src, id, "", file);
                     }
                 } else {
-                    desconectar_usuario(user_dst);
-                    MensajePendiente m;
-                    strncpy(m.remitente, user_src, 255);
-                    m.id = id;
-                    strncpy(m.mensaje, msg, 255);
-                    strncpy(m.nombre_fichero, file, 255);
-                    guardar_mensaje_pendiente(user_dst, m);
-                    printf("s> MESSAGE %u FROM %s TO %s STORED\n", id, user_src, user_dst);
+                    desconectar_usuario(dst);
+                    goto store;
                 }
             } else {
-                MensajePendiente m;
-                strncpy(m.remitente, user_src, 255);
-                m.id = id;
-                strncpy(m.mensaje, msg, 255);
-                strncpy(m.nombre_fichero, file, 255);
-                guardar_mensaje_pendiente(user_dst, m);
-                printf("s> MESSAGE %u FROM %s TO %s STORED\n", id, user_src, user_dst);
+            store: ;
+                MensajePendiente m; strncpy(m.remitente, src, 255); m.id = id;
+                strncpy(m.mensaje, msg, 255); strncpy(m.nombre_fichero, file, 255);
+                guardar_mensaje_pendiente(dst, m);
             }
         }
+    
 
     /* ── USERS ── */
     } else if (strcmp(op, "USERS") == 0) {
         char user_src[256] = {0};
         recv_todo(client_sock, user_src, 256);
 
-        /* Verificar que el usuario está conectado (código 1 si no lo está) */
-        char dummy_ip[16]; int dummy_port;
-        if (esta_conectado(user_src, dummy_ip, &dummy_port) != 0) {
+        char d_ip[16]; int d_p;
+        if (esta_conectado(user_src, d_ip, &d_p) != 0) {
             uint8_t res_byte = 1;
             send_todo(client_sock, &res_byte, 1);
-            printf("s> CONNECTEDUSERS FAIL\n");
         } else {
-            char **nombres;
-            int num_con;
+            char **nombres = NULL;
+            int num_con = 0;
             obtener_usuarios_conectados_lista(&nombres, &num_con);
-
+            
             uint8_t res_byte = 0;
             send_todo(client_sock, &res_byte, 1);
-
-            /* Número de usuarios como campo de 256 bytes */
-            char num_str[256] = {0};
-            sprintf(num_str, "%d", num_con);
+            char num_str[256]; sprintf(num_str, "%d", num_con);
             send_field(client_sock, num_str);
 
-            /* Un campo de 256 bytes por cada usuario */
             for (int i = 0; i < num_con; i++) {
-                send_field(client_sock, nombres[i]);
+                char info[256], ip[16]; int port;
+                esta_conectado(nombres[i], ip, &port);
+                sprintf(info, "%s:%s:%d", nombres[i], ip, port);
+                send_field(client_sock, info);
                 free(nombres[i]);
             }
-            free(nombres);
-
-            printf("s> CONNECTEDUSERS OK\n");
+            if (nombres) free(nombres);
             llamar_rpc_log(user_src, "USERS", "");
         }
     }
@@ -374,10 +279,7 @@ fin:
 int main(int argc, char *argv[]) {
     int port = 8888; /* Puerto por defecto */
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
-            port = atoi(argv[i + 1]);
-            i++;
-        }
+        if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) port = atoi(argv[++i]);
     }
 
     inicializar_sistema();
@@ -404,17 +306,22 @@ int main(int argc, char *argv[]) {
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-        int client_sock = accept(server_sock,
-                                 (struct sockaddr *)&client_addr, &client_len);
+        int client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &client_len);
+        
         if (client_sock >= 0) {
-            ThreadArgs *args = malloc(sizeof(ThreadArgs));
-            args->client_sock  = client_sock;
-            args->client_addr  = client_addr;
-
-            pthread_t tid;
-            pthread_create(&tid, NULL, tratar_peticion, args);
-            pthread_detach(tid);
+            ThreadArgs *a = malloc(sizeof(ThreadArgs));
+            a->client_sock = client_sock; // Corregido
+            a->client_addr = client_addr; // Corregido
+            
+            pthread_t t;
+            if (pthread_create(&t, NULL, tratar_peticion, a) != 0) {
+                free(a);
+                close(client_sock);
+            } else {
+                pthread_detach(t);
+            }
         }
-    }
     return 0;
+    }
+
 }
