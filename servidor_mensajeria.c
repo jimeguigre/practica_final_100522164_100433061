@@ -126,10 +126,11 @@ int enviar_a_cliente(char *ip, int puerto, char *op_protocolo,
 void *tratar_peticion(void *args) {
     ThreadArgs *targs = (ThreadArgs *)args;
     int client_sock = targs->client_sock;
+    struct sockaddr_in client_addr = targs->client_addr; // Copiamos la estructura
 
     /* Obtenemos la IP real del cliente desde accept() */
     char client_ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(targs->client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
     free(targs);
 
     char op[256] = {0};
