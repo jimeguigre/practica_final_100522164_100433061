@@ -50,16 +50,27 @@ void llamar_rpc_log(char *usuario, char *operacion, char *fichero) {
     char *host = getenv("LOG_RPC_IP");
     if (host == NULL) host = "localhost"; // Por defecto localhost
 
+    // 1. Usar un timeout corto para que el servidor no se quede colgado
     CLIENT *clnt = clnt_create(host, LOG_PROG, LOG_VERS, "tcp");
-    if (clnt == NULL) return;
+    
+    // 2. VERIFICACIÓN CRÍTICA: Si clnt es NULL, salimos de la función
+    if (clnt == NULL) {
+        fprintf(stderr, "s> Error: No se pudo conectar con el servidor RPC en %s\n", host);
+        return; 
+    }
 
     struct log_data data;
-    data.usuario   = usuario;
-    data.operacion = operacion;
-    data.fichero   = fichero ? fichero : "";
+    // Aseguramos que los punteros no sean NULL para evitar Segfault en XDR
+    data.usuario   = usuario ? usuario : "unknown";
+    data.operacion = operacion ? operacion : "none";
+    data.fichero   = (fichero && strlen(fichero) > 0) ? fichero : "";
 
     int *result = log_operacion_1(&data, clnt);
-    if (result == NULL) clnt_perror(clnt, "Error RPC");
+    
+    if (result == NULL) {
+        clnt_perror(clnt, "s> Error en llamada RPC");
+    }
+
     clnt_destroy(clnt);
 }
 
@@ -127,7 +138,7 @@ void *tratar_peticion(void *args) {
     /* ── REGISTER ── */
     if (strcmp(op, "REGISTER") == 0) {
         char user[256] = {0};
-        recv_todo(client_sock, user, 256);
+        if (recv_todo(client_sock, user, 256) < 0) goto fin;
 
         int res = registrar_usuario(user);
         uint8_t res_byte = (uint8_t)res;
@@ -309,16 +320,16 @@ int main(int argc, char *argv[]) {
         int client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &client_len);
         
         if (client_sock >= 0) {
-            ThreadArgs *a = malloc(sizeof(ThreadArgs));
-            a->client_sock = client_sock; // Corregido
-            a->client_addr = client_addr; // Corregido
+            ThreadArgs *args = malloc(sizeof(ThreadArgs));
+            args->client_sock = client_sock; // ¡Asegúrate que aquí no diga c_sock!
+            args->client_addr = client_addr; // ¡Asegúrate que aquí no diga c_addr!
             
-            pthread_t t;
-            if (pthread_create(&t, NULL, tratar_peticion, a) != 0) {
-                free(a);
+            pthread_t tid;
+            if (pthread_create(&tid, NULL, tratar_peticion, args) != 0) {
+                free(args);
                 close(client_sock);
             } else {
-                pthread_detach(t);
+                pthread_detach(tid);
             }
         }
     return 0;
