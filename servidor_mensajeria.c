@@ -322,8 +322,8 @@ int main(int argc, char *argv[]) {
         
         if (client_sock >= 0) {
             ThreadArgs *args = malloc(sizeof(ThreadArgs));
-            args->client_sock = client_sock; // ¡Asegúrate que aquí no diga c_sock!
-            args->client_addr = client_addr; // ¡Asegúrate que aquí no diga c_addr!
+            args->client_sock = client_sock; 
+            args->client_addr = client_addr;
             
             pthread_t tid;
             if (pthread_create(&tid, NULL, tratar_peticion, args) != 0) {
@@ -333,7 +333,6 @@ int main(int argc, char *argv[]) {
                 pthread_detach(tid);
             }
         }
-    return 0;
     }
-
+    return 0;
 }
