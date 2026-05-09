@@ -7,13 +7,13 @@ import requests
 
 class client:
 
-    # ******************** TYPES *********************
+    # TIPOS DE RESPUESTA
     class RC(Enum):
         OK = 0
         ERROR = 1
         USER_ERROR = 2
 
-    # ****************** ATTRIBUTES ******************
+    # ATRIBUTOS DE CLASE
     _server = None
     _port = -1
 
@@ -23,8 +23,8 @@ class client:
     _listen_thread = None        # hilo receptor de mensajes
     _listen_port = -1            # puerto de escucha asignado
     _connected_users_info = {}   # Guarda { 'nombre': ('IP', puerto) }
-    # ****************** AUXILIARES ******************
-
+    
+    # FUNCIONES AUXILIARES
     @staticmethod
     def _send_field(sock, text):
         """Envía un campo de exactamente 256 bytes terminado en \0."""
@@ -52,7 +52,7 @@ class client:
             return s.getsockname()[1]
 
     @staticmethod
-    def _listener_thread_func():
+    def _listener_thread_func(): # Función que corre en el hilo receptor para atender mensajes entrantes
         listen_sock = client._listen_socket
         listen_sock.listen(10)
 
@@ -107,7 +107,7 @@ class client:
             finally:
                 conn.close()
 
-    # ******************** METHODS *******************
+    # MÉTODOS PRINCIPALES
 
     @staticmethod
     def register(user):
@@ -417,6 +417,7 @@ class client:
 
     @staticmethod
     def shell():
+        # Shell interactiva para que el usuario introduzca comandos.
         while True:
             try:
                 command = input("c> ")
@@ -492,6 +493,7 @@ class client:
 
     @staticmethod
     def parseArguments(argv):
+        # El parseo de argumentos se hace con argparse, que ya se encarga de mostrar mensajes de error y usage automáticamente
         parser = argparse.ArgumentParser()
         parser.add_argument('-s', type=str, required=True, help='Server IP')
         parser.add_argument('-p', type=int, required=True, help='Server Port')

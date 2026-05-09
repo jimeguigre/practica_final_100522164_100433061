@@ -15,7 +15,7 @@ typedef struct {
     struct sockaddr_in client_addr;
 } ThreadArgs;
 
-/* ── Envío y recepción completa (sin cortes parciales de TCP) ── */
+/* Envío y recepción completa (sin cortes parciales de TCP) */
 
 static ssize_t send_todo(int sock, const void *buf, size_t len) {
     size_t enviado = 0;
@@ -37,7 +37,7 @@ static ssize_t recv_todo(int sock, void *buf, size_t len) {
     return (ssize_t)recibido;
 }
 
-/* ── Envía un campo de exactamente 256 bytes (relleno con \0) ── */
+/* Envía un campo de exactamente 256 bytes (relleno con \0) */
 static int send_field(int sock, const char *str) {
     char buf[256] = {0};
     if (str != NULL) 
@@ -45,15 +45,15 @@ static int send_field(int sock, const char *str) {
     return (send_todo(sock, buf, 256) == 256) ? 0 : -1;
 }
 
-/* ── Llama al servicio RPC de log ── */
+/* Llama al servicio RPC de log */
 void llamar_rpc_log(char *usuario, char *operacion, char *fichero) {
     char *host = getenv("LOG_RPC_IP");
     if (host == NULL) host = "localhost"; // Por defecto localhost
 
-    // 1. Usar un timeout corto para que el servidor no se quede colgado
+    // Usar un timeout corto para que el servidor no se quede colgado
     CLIENT *clnt = clnt_create(host, LOG_PROG, LOG_VERS, "tcp");
     
-    // 2. VERIFICACIÓN CRÍTICA: Si clnt es NULL, salimos de la función
+    // VERIFICACIÓN CRÍTICA: Si clnt es NULL, salimos de la función
     if (clnt == NULL) {
         fprintf(stderr, "s> Error: No se pudo conectar con el servidor RPC en %s\n", host);
         return; 
@@ -122,7 +122,7 @@ int enviar_a_cliente(char *ip, int puerto, char *op_protocolo,
     return 0;
 }
 
-/* ── Hilo que atiende una petición de un cliente ── */
+/* Hilo que atiende una petición de un cliente */
 void *tratar_peticion(void *args) {
     ThreadArgs *targs = (ThreadArgs *)args;
     int client_sock = targs->client_sock;
@@ -166,7 +166,7 @@ void *tratar_peticion(void *args) {
         char puerto_str[256] = {0};
 
         recv_todo(client_sock, user, 256);
-        /* El puerto llega como cadena (ej: "8080"), NO como entero binario */
+        /* El puerto llega como cadena no como entero binario */
         recv_todo(client_sock, puerto_str, 256);
         int puerto_cliente = atoi(puerto_str);
 
@@ -177,7 +177,7 @@ void *tratar_peticion(void *args) {
         printf("s> %s %s %s\n", op, user, res == 0 ? "OK" : "FAIL");
         llamar_rpc_log(user, "CONNECT", "");
 
-        /* Si la conexión fue exitosa, enviamos mensajes pendientes (protocolo 8.6) */
+        /* Si la conexión fue exitosa, enviamos mensajes pendientes */
         if (res == 0) {
             usleep(150000);  /* Pequeña espera para asegurar que el cliente ya está escuchando antes de enviar mensajes */
             MensajePendiente pendientes[50];
@@ -289,7 +289,7 @@ fin:
     pthread_exit(NULL);
 }
 
-/* ── Main: inicializa y escucha conexiones ── */
+/* Main: inicializa y escucha conexiones */
 int main(int argc, char *argv[]) {
     int port = 8888; /* Puerto por defecto */
     for (int i = 1; i < argc; i++) {
