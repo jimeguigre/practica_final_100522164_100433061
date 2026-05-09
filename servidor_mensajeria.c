@@ -237,6 +237,7 @@ void *tratar_peticion(void *args) {
                     if (esta_conectado(src, s_ip, &s_port) == 0) {
                         char *op_ack = is_attach ? "SEND_MESS_ATTACH_ACK" : "SEND_MESS_ACK";
                         enviar_a_cliente(s_ip, s_port, op_ack, src, id, "", file);
+                        printf("s> SEND MESSAGE %u FROM %s TO %s\n", id, src, dst);
                     }
                 } else {
                     desconectar_usuario(dst);
@@ -247,6 +248,7 @@ void *tratar_peticion(void *args) {
                 MensajePendiente m; strncpy(m.remitente, src, 255); m.id = id;
                 strncpy(m.mensaje, msg, 255); strncpy(m.nombre_fichero, file, 255);
                 guardar_mensaje_pendiente(dst, m);
+                printf("s> MESSAGE %u FROM %s TO %s STORED\n", id, src, dst);
             }
         }
     

@@ -65,23 +65,32 @@ class client:
             try:
                 op = client._recv_field(conn)
 
-                if op == "SEND_MESSAGE" or op == "SEND_MESSAGE_ATTACH":
+                if op == "SEND_MESSAGE":
                     remitente = client._recv_field(conn)
                     id_msg    = client._recv_field(conn)
                     mensaje   = client._recv_field(conn)
-                    if op == "SEND_MESSAGE_ATTACH":
-                        fichero = client._recv_field(conn)
-                        print(f"\ns> MESSAGE {id_msg} FROM {remitente}\n{mensaje}\nEND\nFILE {fichero}")
-                    else:
-                        print(f"\ns> MESSAGE {id_msg} FROM {remitente}\n{mensaje}\nEND")
+                    print(f"\ns> MESSAGE {id_msg} FROM {remitente}")
+                    print(mensaje)
+                    print("END")
 
-                elif op == "SEND_MESS_ACK" or op == "SEND_MESS_ATTACH_ACK":
+                elif op == "SEND_MESSAGE_ATTACH":
+                    remitente = client._recv_field(conn)
+                    id_msg    = client._recv_field(conn)
+                    mensaje   = client._recv_field(conn)
+                    fichero   = client._recv_field(conn)
+                    print(f"\ns> MESSAGE {id_msg} FROM {remitente}")
+                    print(mensaje)
+                    print("END")
+                    print(f"FILE {fichero}")
+
+                elif op == "SEND_MESS_ACK":
                     id_msg = client._recv_field(conn)
-                    if op == "SEND_MESS_ATTACH_ACK":
-                        fichero = client._recv_field(conn)
-                        print(f"\nc> SENDATTACH MESSAGE {id_msg} {fichero} OK")
-                    else:
-                        print(f"\nc> SEND MESSAGE {id_msg} OK")
+                    print(f"\nc> SEND MESSAGE {id_msg} OK")
+
+                elif op == "SEND_MESS_ATTACH_ACK":
+                    id_msg  = client._recv_field(conn)
+                    fichero = client._recv_field(conn)
+                    print(f"\nc> SENDATTACH MESSAGE {id_msg} {fichero} OK")
 
                 elif op == "GET FILE":
                     # Petición de otro cliente para descargar un archivo
@@ -89,7 +98,7 @@ class client:
                     fichero = client._recv_field(conn)
                     try:
                         with open(fichero, 'rb') as f:
-                            while chunk := f.read(1024):
+                            while chunk := f.read(4096):
                                 conn.sendall(chunk)
                     except Exception as e:
                         pass # Si no existe el fichero, simplemente se cierra la conexión
@@ -319,14 +328,13 @@ class client:
                 print(f"c> CONNECTED USERS ({num} users connected) OK")
                 # Recibir cada usuario (una cadena por usuario)
                 for _ in range(num):
-                    user_info = client._recv_field(s)
-                    print(f"  {user_info}")
-                    parts = user_info.split(":")
-                    if len(parts) == 3:
-                        u_name = parts[0].strip()
-                        u_ip = parts[1].strip()
-                        u_port = int(parts[2].strip())
-                        client._connected_users_info[u_name] = (u_ip, u_port)
+                    info = client._recv_field(s)
+                    # Formato: "usuario :: IP :: puerto"
+                    partes = info.split(" :: ")
+                    if len(partes) == 3:
+                        nombre, ip, puerto = partes
+                        client._usuarios_conectados[nombre] = (ip, int(puerto))
+                        print(f"  {info}")
                 s.close()
                 return client.RC.OK
             elif res == 1:
@@ -377,15 +385,15 @@ class client:
         
     @staticmethod
     def getfile(user, remote_filename, local_filename):
-        """Descarga un fichero directamente de otro usuario conectado[cite: 3]."""
+        """Descarga un fichero directamente de otro usuario conectado."""
         if user not in client._connected_users_info:
-            # Si no está en caché, refrescamos la lista internamente[cite: 3]
-            client.users()
-            if user not in client._connected_users_info:
-                print("c> FILE TRANSFER FAILED, user not connected.")
-                return client.RC.ERROR
+            # Si no está en caché, refrescamos la lista internamente
+            client.users()  # consultamos al servidor 
+        if user not in client._usuarios_conectados:
+            print("c> FILE TRANSFER FAILED, user not connected.")
+            return client.RC.ERROR
 
-        ip, port = client._connected_users_info[user]
+        ip, port = client._usuarios_conectados[user]
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((ip, port))
@@ -395,7 +403,7 @@ class client:
             
             with open(local_filename, 'wb') as f:
                 while True:
-                    data = s.recv(1024)
+                    data = s.recv(4096)
                     if not data:
                         break
                     f.write(data)
@@ -405,7 +413,7 @@ class client:
         except Exception:
             print("c> GETFILE FAIL")
             return client.RC.ERROR
-    # ******************** SHELL ********************
+        
 
     @staticmethod
     def shell():

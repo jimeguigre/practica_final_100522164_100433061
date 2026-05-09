@@ -69,6 +69,11 @@ int desconectar_usuario(char *nombre);
 int obtener_usuarios_conectados(char **buffer, int *num_usuarios);
 
 /**
+ * @brief Obtiene lista de nombres de usuarios conectados.
+ */
+int obtener_usuarios_conectados_lista(char ***lista_nombres, int *num_usuarios);
+
+/**
  * @brief Incrementa y devuelve el siguiente ID de mensaje para un usuario.
  */
 unsigned int generar_siguiente_id(char *nombre_remitente);
