@@ -273,7 +273,7 @@ void *tratar_peticion(void *args) {
             for (int i = 0; i < num_con; i++) {
                 char info[256], ip[16]; int port;
                 esta_conectado(nombres[i], ip, &port);
-                sprintf(info, "%s:%s:%d", nombres[i], ip, port);
+                sprintf(info, "%s :: %s :: %d", nombres[i], ip, port);
                 send_field(client_sock, info);
                 free(nombres[i]);
             }
