@@ -1,23 +1,71 @@
-# Práctica de Sistemas Distribuidos - Servicio de Mensajería
+# Práctica de Sistemas Distribuidos — Servicio de Mensajería
 ## Instrucciones de Compilación y Despliegue
 
-### 1. Compilación de los Servidores en C
-En la carpeta raíz del proyecto donde se encuentra el código fuente y el Makefile, ejecute el siguiente comando para generar automáticamente el código RPC y compilar ambos servidores (el de mensajería y el de log):
+### Requisitos previos
+- Sistema operativo Linux
+- GCC y rpcgen instalados
+- Python 3 con las dependencias: `pip install flask requests`
+
+
+### 1. Compilación
+Desde el directorio raíz del proyecto, ejecute:
 $ make
+Esto invoca `rpcgen` para generar los stubs RPC y compila los ejecutables
+`server` (servidor de mensajería) y `rpc_server` (servidor de log).
 
-### 2. Despliegue del Servidor de Log (RPC)
-Inicie el servidor de registro que imprimirá las operaciones realizadas por los usuarios:
+
+### 2. Orden de despliegue
+
+Los servicios deben arrancarse **en el siguiente orden**:
+
+#### Paso 1 — Servidor de Log RPC
+En una terminal, ejecute:
 $ ./rpc_server
+El servidor quedará escuchando peticiones RPC.
 
-### 3. Despliegue del Servicio Web (Python)
-Abra una nueva terminal y ejecute el microservicio Flask encargado de normalizar los mensajes (asegúrese de tener instaladas las dependencias con `pip install flask requests`):
+#### Paso 2 — Servicio Web de normalización (Flask)
+En una nueva terminal, en la **máquina donde ejecutará el cliente**, ejecute:
 $ python3 word_service.py
+El servicio quedará escuchando en `http://localhost:5001`.
 
-### 4. Despliegue del Servidor de Mensajería (C)
-En una nueva terminal, configure la variable de entorno obligatoria para que el servidor localice el servicio RPC y ejecútelo en el puerto deseado (por ejemplo, 8888):
+#### Paso 3 — Servidor de Mensajería
+En una nueva terminal, configure la variable de entorno con la IP
+del servidor RPC y arranque el servidor indicando el puerto:
 $ export LOG_RPC_IP=127.0.0.1
-$ ./server 8888
+$ ./server -p 8888
+Sustituya `127.0.0.1` por la IP real de la máquina donde corre `rpc_server` si es una máquina distinta.
 
-### 5. Ejecución del Cliente (Python)
-Por último, abra tantas terminales como usuarios desee simular. Ejecute el script cliente pasando la IP y el puerto del servidor de mensajería:
-$ python3 client_2.py -s localhost -p 8888
+#### Paso 4 — Clientes
+Abra una terminal por cada usuario que desee simular y ejecute:
+$ python3 client.py -s <IP_SERVIDOR> -p <PUERTO>
+Ejemplo con servidor local en puerto 8888:
+$ python3 client.py -s 127.0.0.1-p 8888
+
+
+### 3. Comandos disponibles en el cliente
+
+| Comando | Descripción |
+|---|---|
+| `REGISTER <user>` | Registra un nuevo usuario |
+| `UNREGISTER <user>` | Da de baja a un usuario |
+| `CONNECT <user>` | Conecta al usuario al servicio |
+| `DISCONNECT <user>` | Desconecta al usuario |
+| `USERS` | Lista los usuarios conectados |
+| `SEND <user> <mensaje>` | Envía un mensaje a un usuario |
+| `SENDATTACH <user> <fichero> <mensaje>` | Envía mensaje con fichero adjunto |
+| `GETFILE <user> <fichero_remoto> <fichero_local>` | Descarga un fichero de otro usuario (P2P) |
+| `QUIT` | Cierra el cliente |
+
+
+### 4. Ejecución con Docker (contenedores con IPs distintas)
+
+Si se prueba con contenedores, cada cliente debe tener su propio
+servicio Flask corriendo localmente. La variable `LOG_RPC_IP` debe
+apuntar a la IP del contenedor donde corre `rpc_server`.
+
+
+### 5. Notas adicionales
+
+- El servicio Flask debe estar corriendo **antes** de enviar mensajes,  ya que el cliente lo consulta en cada SEND y SENDATTACH.
+- Los ficheros usados en SENDATTACH y GETFILE deben indicarse con **ruta absoluta**, por ejemplo `/tmp/datos.txt`.
+- Si el servidor RPC no está disponible, el servidor de mensajería continúa funcionando (el log simplemente no se registra).
