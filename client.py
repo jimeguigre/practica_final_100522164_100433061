@@ -22,7 +22,8 @@ class client:
     _listen_socket = None        # socket de escucha para mensajes entrantes
     _listen_thread = None        # hilo receptor de mensajes
     _listen_port = -1            # puerto de escucha asignado
-    _connected_users_info = {}   # Guarda { 'nombre': ('IP', puerto) }
+    _usuarios_conectados = {}   # Guarda { 'nombre': ('IP', puerto) }
+    _connected_users_info = {}  # Cache de información de usuarios conectados (nombre -> (IP, puerto))
     
     # FUNCIONES AUXILIARES
     @staticmethod
